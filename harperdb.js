@@ -244,6 +244,6 @@ module.exports = {
 
     run: query => { // more intuitive alias for running sql queries
         if(!this.db) throw new Error("Connection invalid!")
-        return this.db?.run(query)
+        return this.db?.request(query)
     }
 }
