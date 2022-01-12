@@ -27,5 +27,8 @@
         "json db",
         "connector",
         "adapter"
-    ]
+    ],
+    "dependencies": {
+        "needle": "^3.0.0"
+    }
 }
