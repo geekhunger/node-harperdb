@@ -16,6 +16,7 @@ class HarperDB {
         this.auth = auth
         this.schema = schema
         this.table = table
+        this.primary_key = "id"
         this.schema_undefined = this.table_undefined = true
     }
 
@@ -86,7 +87,7 @@ class HarperDB {
                         operation: "create_table",
                         schema: this.schema,
                         table: this.table,
-                        hash_attribute: "id" // default name of the uuid column
+                        hash_attribute: this.primary_key // default name of the uuid column
                     }).catch(() => {})
                 } finally {
                     this.table_undefined = false
