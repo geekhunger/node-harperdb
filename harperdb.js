@@ -223,14 +223,14 @@ class HarperDB {
 
 
 module.exports = {
-    database: (instance, auth) => {
+    database: (instance, auth, schema, table) => {
         if(!(instance && auth) && !!this.db) {
             return this.db
         }
         if((typeof instance !== "string" || typeof auth !== "string") && !this.db) {
             throw new Error("Credentials invalid!")
         }
-        this.db = new HarperDB(instance, auth, this.db?.schema, this.db?.table)
+        this.db = new HarperDB(instance, auth, schema ?? this.db?.schema, table ?? this.db?.table)
         return this.db
     },
 
