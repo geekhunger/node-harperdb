@@ -1,10 +1,3 @@
-<style type="text/css">
-    .center {margin: 0 auto;}
-    .headroom {margin-top: 48px;}
-    .narrow {max-width: 60%;}
-    .grid-2 {display: grid; grid-template-columns: repeat(2, minmax(0, auto)); align-items: start; align-self: center; justify-items: center}
-</style>
-
 # node-harperdb
 
 ## Why?
@@ -23,29 +16,31 @@ npm i node-harperdb
 const {database, mount, run} = require("node-harperdb")
 ```
 
-### Instance Properties
-- db.instance
-- db.auth
-- db.schema
-- db.table
-- db.primary_key
+### Public class properties
+- `db.instance`
+- `db.auth`
+- `db.schema`
+- `db.table`
+- `db.primary_key`
 
-#### Private Instance Properties
-- db.schema_undefined
-- db.table_undefined
-- db.pipeline
+#### Private class properties
+- `db.schema_undefined`
+- `db.table_undefined`
+- `db.pipeline`
 
-### Instance Methods
-- `db.request(query)`
+### Public class methods
 - `db.run(query)`
-- `db.insert(record)`
-- `db.insert(record)`
-- `db.update(record)`
-- `db.upsert(record)`
+- `db.insert(records)`
+- `db.update(records)`
+- `db.upsert(records)`
 - `db.select(filter)`
+- `db.uid(records)`
 - `db.delete(query)`
 - `db.pipe(request, ...params)`
-- `db.drain()`
+- `db.drain(clean = true)`
+
+#### Private class methods
+- `db.request(query)`
 
 ```js
 !async function() {
@@ -69,8 +64,8 @@ const {database, mount, run} = require("node-harperdb")
 
 
 
-
-<hr class="headroom">
+<br>
+<br>
 
 ## Preparations
 
@@ -78,13 +73,13 @@ First, visit [HarperDB Studio](https://studio.harperdb.io) and create your free 
 
 Create a new Organization and a new HarperDB Cloud Instance within it. - The Cloud Instance is sort of your VPS that is hosting your installation of HarperDB. You can have one for free, with fixed specs; additional Instances need to be paid separately.
 
-<div class="narrow center">
-    <p class="grid-2 center">
+<div style="max-width: 60%; margin: 0 auto;">
+    <p style="display: grid; grid-template-columns: repeat(2, minmax(0, auto)); align-items: start; align-self: center; justify-items: center;">
         <img src="img/instance-create.jpg">
         <img src="img/instance-preview.jpg">
     </p>
-    <img src="img/instance-plan.jpg" class="center">
-    <p class="grid-2 center ">
+    <img src="img/instance-plan.jpg">
+    <p style="display: grid; grid-template-columns: repeat(2, minmax(0, auto)); align-items: start; align-self: center; justify-items: center;">
         <img src="img/instance-meta.jpg">
         <img src="img/instance-specs.jpg">
     </p>
@@ -138,7 +133,6 @@ Once connected, you can switch the schema and table at any time.because you can 
 
 ## HarperDB class methods:
 
-<hr class="headroom">
 
 - ### `db.request(query)`
 
