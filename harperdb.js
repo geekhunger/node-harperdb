@@ -1,5 +1,9 @@
 const request = require("needle")
-const valid_record = input => Array.isArray(input) || typeof input === "string" ? input : [input]
+
+const valid_record = input => {
+    return Array.isArray(input) || typeof input === "string" ? input : [input]
+}
+
 const valid_json = obj => {
     try {return JSON.stringify(obj)}
     catch(error) {return null}
@@ -80,7 +84,7 @@ class HarperDB {
                             table: this.table
                         })
                     } else if(!schema[this.table]) {
-                        throw new Error(`Table '${this.table}' not defined`)
+                        throw new Error(`Missing table '${this.table}'!`)
                     }
                 } catch(_) {
                     await this.request({
@@ -98,126 +102,158 @@ class HarperDB {
     }
 
 
-    async insert(record) { // can be a single object or an array
+    async insert(records) { // can be a single object or an array
         return await this.run({
             operation: "insert",
             schema: this.schema,
             table: this.table,
-            records: valid_record(record)
+            records: valid_record(records)
         })
     }
 
 
-    async update(record) { // can be a single object or an array
+    async update(records) { // can be a single object or an array
         return await this.run({
             operation: "update",
             schema: this.schema,
             table: this.table,
-            records: valid_record(record)
+            records: valid_record(records)
         })
     }
 
 
-    async upsert(record) { // can be a single object or an array
-        record = valid_record(record)
-        try { // check if payload records contain primary keys, otherwise find their primary keys and use then in the request, such that we don't trigger creation of new records in the database
-            const schema = await this.request({
+    async upsert(records, lax = false) { // can be a single object or an array
+        records = valid_record(records)
+        
+        /*if(lax === true) {
+            const incomplete = records.filter(elem => !elem[this.primary_key])
+            const autocompleted = (await this.select(incomplete)).map((elem, pos) => {
+                return Object.assign(elem, incomplete[pos])
+            })
+
+            const complete = records.filter(elem => !!elem[this.primary_key])
+            
+            //Object.assign(rec, findings[i])
+            const autocomplete = []
+
+        }*/
+
+        return await this.run({
+            operation: "upsert",
+            schema: this.schema,
+            table: this.table,
+            records: records
+        })
+    }
+
+
+    async select(filter) { // argument is optional, but could be an object, or an array (of strings or objects)
+        if(!filter) {
+            // without filtering attributes, the search will return the table structure
+            return await this.run({
                 operation: "describe_table",
                 schema: this.schema,
                 table: this.table
             })
-            const primary_key = schema.hash_attribute
-            for(let new_item of record) {
-                if(!new_item[primary_key]) {
-                    const db_entry = await this.select(new_item)
-                    switch(db_entry.length) {
-                        case 0: break; // no primary key available because does not exist in db yet!
-                        case 1: new_item[primary_key] = db_entry[0][primary_key]; break; // already exist (copy its primary key)
-                        default: //console.info(`Found ${db_entry.length} existing entries in database that match a new record from an 'upsert' command (expected 1 entry at most)! Instead of updating an existing entry a new record will be created.`, {new: new_item, existing: db_entry})
-                    }
-                }
-            }
-        } catch(_) {
-        } finally {
-            return await this.run({
-                operation: "upsert",
-                schema: this.schema,
-                table: this.table,
-                records: record
-            })
         }
-    }
 
-
-    async select(filter) { // can be optional, or an object (exact match), or an array
-        const table = await this.run({
-            operation: "describe_table",
-            schema: this.schema,
-            table: this.table
-        })
-        if(!filter) { // The search result will be a table schema description if no filtering options have been set, for example: db.select()
-            //console.info(`Selecting records from database without filtering options will return the table schema instead of a search result!`)
-            return table
-        }
-        let match
-        const conditions = []
-        if(typeof filter === "object" && !Array.isArray(filter)) { // The search result will be an exact match of all attributes and values from the filtering options, for example: db.select({username: "geekhunger", email: "hallo@geekhunger.de"})
-            match = "and"
-            for(const [attr, val] of Object.entries(filter)) {
-                conditions.push({
-                    search_attribute: attr,
-                    search_value: val,
-                    search_type: "equals"
-                })
-            }
-        } else {
-            if(!Array.isArray(filter)) {
-                throw new Error("Could not select records from database because filtering options are malformed! Filter must be either nothing, an object of attributes and values for an exact match, or an array of values to search for.")
-            }
-            for(const attr of table.attributes.map(attr => attr.attribute)) { // collect all available attributes from table schema and create one search query for every attribute and value combination
-                for(const val of filter) {
-                    conditions.push({
-                        search_attribute: attr,
-                        search_value: val,
-                        search_type: "contains"
-                    })
-                }
-            }
-        }
-        return await this.run({ // The search result will contain any record that 'includes' one or more of the value from the filtering options, for example `db.select(["hello"])` will match entries that contain the 'hello' sub-string in any of their attributes!
+        const is_array = elem => Array.isArray(elem)
+        const is_object = elem => typeof elem === "object" && !is_array(elem)
+        const query = {
             operation: "search_by_conditions",
             schema: this.schema,
             table: this.table,
             get_attributes: ["*"],
-            conditions: conditions,
-            operator: match || "or",
+            conditions: [],
+            operator: "and",
             offset: 0,
             limit: undefined // NOTE 'null' doesn't work as stated in docs!
-        })
+        }
+
+        if(is_object(filter)) {
+            for(const [attr, val] of Object.entries(filter)) {
+                if(val !== undefined && val !== null) { // TODO This is a temporary workaround. I've submitted a ticket to HarperDB support because it should possible to search for values of null!
+                    query.conditions.push({
+                        search_attribute: attr,
+                        search_value: val,
+                        search_type: "equals"
+                    })
+                }
+            }
+            // search result will be an array of existing db records that 'match' all of the filtering attributes
+            return await this.run(query)
+        }
+        
+        if(is_array(filter) && filter.every(elem => typeof elem === "string")) {
+            const struct = await this.run({
+                operation: "describe_table",
+                schema: this.schema,
+                table: this.table
+            })
+            for(const attr of struct.attributes.map(attr => attr.attribute)) {
+                for(const val of filter) {
+                    if(val !== undefined && val !== null) { // TODO (see ticket)
+                        query.conditions.push({
+                            search_attribute: attr,
+                            search_value: val,
+                            search_type: "contains"
+                        })
+                    }
+                }
+            }
+            // search result will be an array of existing db records that 'include' or 'contain' one or more filtering attrubutes
+            // it's like searching a sub-string in text
+            query.operator = "or"
+            return await this.run(query)
+        }
+
+        if(is_array(filter) && filter.every(is_object)) {
+            for(const rec of filter) this.pipe(this.select, rec) // NOTE piping to .select as plain-object (not an array)!
+            return await this.drain()
+        }
+
+        throw new Error("Could not find any records because of malformed filtering!")
     }
 
 
-    async detete(identifier) { // can be a single string or an array
+    async uid(records) {
+        return (await this.select(records)).map(rec => rec[this.primary_key])
+    }
+
+
+    async detete(uid) { // can be a single string or an array
         return await this.run({
             operation: "delete",
             schema: this.schema,
             table: this.table,
-            hash_values: valid_record(identifier)
+            hash_values: valid_record(uid)
         })
     }
 
 
     pipe(request, ...params) { // queue database operations to execute then later all at once
-        if(typeof request !== "function") throw new Error("Could not batch request without any handler function!")
+        if(typeof request !== "function") throw new Error("Could not batch request without a handler function!")
         if(!Array.isArray(this.pipeline)) this.pipeline = [] // init queue
         this.pipeline.push(Promise.resolve(request.call(this, ...params))) // https://stackoverflow.com/q/60980357/4383587
     }
 
 
-    async drain() { // concurrent execution of all pipelined database requests
-        const response = await Promise.all(this.pipeline || [])
-        this.pipeline = [] // reset queue
-        return response
+    async drain(clean = true) { // concurrent execution of all pipelined database requests
+        if(Array.isArray(this.pipeline) && this.pipeline.length > 0) {
+            const response = await Promise.all(this.pipeline)
+            this.pipeline = undefined
+            if(clean === true) {
+                return response
+                    .filter(elem => !!elem && elem.length > 0) // remove empty results
+                    .map(elem => elem.length === 1 ? elem[0] : elem) // unpack findings
+            }
+            return response
+                .map(elem => {
+                    if((elem.length === 0)) return {} // replace empty results
+                    return elem.length === 1 ? elem[0] : elem // unpack findings
+                })
+        }
+        throw new Error("Missing request batch!")
     }
 }
 
@@ -228,16 +264,16 @@ module.exports = {
             return this.db
         }
         if((typeof instance !== "string" || typeof auth !== "string") && !this.db) {
-            throw new Error("Credentials invalid!")
+            throw new Error("Invalid credentials!")
         }
         this.db = new HarperDB(instance, auth, schema ?? this.db?.schema, table ?? this.db?.table)
         return this.db
     },
 
     mount: (schema, table) => { // alias for swapping namespaces (omit 'new' keyword for class instances)
-        if(typeof schema !== "string") throw new Error("Schema not specified")
+        if(typeof schema !== "string") throw new Error("Invalid schema name!")
         if(typeof table !== "string") [schema, table] = schema.split(".") // support for object-like name chaining: "schema.table"
-        if(typeof table !== "string") throw new Error("Table not specified")
+        if(typeof table !== "string") throw new Error("Invalid table name!")
         this.db = new HarperDB(this.db?.instance, this.db?.auth, schema, table)
         return this.db
     },
