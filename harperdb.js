@@ -214,7 +214,7 @@ class HarperDB {
 
         if(is_array(filter) && filter.every(is_object)) {
             for(const rec of filter) this.pipe(this.select, rec) // NOTE piping to .select as plain-object (not an array)!
-            return await this.drain()
+            return (await this.drain()).flat()
         }
 
         throw new Error("Could not find any records because of malformed filtering!")
