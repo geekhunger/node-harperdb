@@ -146,6 +146,11 @@ class HarperDB {
         })
     }
 
+    
+    async uid(records) {
+        return (await this.select(records)).map(rec => rec[this.primary_key])
+    }
+
 
     async select(filter) { // argument is optional, but could be an object, or an array (of strings or objects)
         if(!filter) {
