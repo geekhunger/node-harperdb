@@ -164,7 +164,7 @@ class HarperDB {
 
         const is_array = elem => Array.isArray(elem)
         const is_object = elem => typeof elem === "object" && !is_array(elem)
-        const query = {
+        let query = {
             operation: "search_by_conditions",
             schema: this.schema,
             table: this.table,
