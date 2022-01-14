@@ -45,6 +45,23 @@ class HarperDB {
     }
 
 
+    pipe(request, ...params) { // queue database operations to execute then later all at once
+        if(typeof request !== "function") throw new Error("Could not batch request without a handler function!")
+        if(!Array.isArray(this.pipeline)) this.pipeline = [] // init queue
+        this.pipeline.push(Promise.resolve(request.call(this, ...params))) // https://stackoverflow.com/q/60980357/4383587
+    }
+
+
+    async drain() { // concurrent execution of all pipelined database requests
+        if(Array.isArray(this.pipeline) && this.pipeline.length > 0) {
+            let response = await Promise.all(this.pipeline)
+            this.pipeline = undefined
+            return response
+        }
+        throw new Error("Missing request batch!")
+    }
+
+
     async run(query) {
         /*
             Argument can be any valid SQL query string
@@ -122,27 +139,41 @@ class HarperDB {
     }
 
 
-    async upsert(records, lax = false) { // can be a single object or an array
+    async upsert(records) { // can be a single object or an array
         records = valid_record(records)
-        
-        /*if(lax === true) {
-            const incomplete = records.filter(elem => !elem[this.primary_key])
-            const autocompleted = (await this.select(incomplete)).map((elem, pos) => {
-                return Object.assign(elem, incomplete[pos])
-            })
+        let insert_candidate = records.filter(elem => !!elem[this.primary_key])
+        let update_candidate = records.filter(elem => !elem[this.primary_key])
 
-            const complete = records.filter(elem => !!elem[this.primary_key])
-            
-            //Object.assign(rec, findings[i])
-            const autocomplete = []
+        for(const rec of update_candidate) {
+            if(!rec[this.primary_key]) {
+                this.pipe(this.select, rec)
+            }
+        }
 
-        }*/
+        for(let [pos, findings] of Object.entries(await this.drain())) {
+            if(findings.length === 0 || findings.length > 1) {
+                insert_candidate.push(update_candidate[pos])
+                update_candidate[pos] = undefined
+            } else {
+                update_candidate[pos] = Object.assign(findings[0], update_candidate[pos])
+            }
+        }
 
         return await this.run({
             operation: "upsert",
             schema: this.schema,
             table: this.table,
-            records: records
+            records: [insert_candidate, update_candidate.filter(Boolean)].flat(1) // remove undefined and unpack nested
+        })
+    }
+
+
+    async detete(uid) { // can be a single string or an array
+        return await this.run({
+            operation: "delete",
+            schema: this.schema,
+            table: this.table,
+            hash_values: valid_record(uid)
         })
     }
 
@@ -218,47 +249,6 @@ class HarperDB {
         }
 
         throw new Error("Could not find any records because of malformed filtering!")
-    }
-
-
-    async uid(records) {
-        return (await this.select(records)).map(rec => rec[this.primary_key])
-    }
-
-
-    async detete(uid) { // can be a single string or an array
-        return await this.run({
-            operation: "delete",
-            schema: this.schema,
-            table: this.table,
-            hash_values: valid_record(uid)
-        })
-    }
-
-
-    pipe(request, ...params) { // queue database operations to execute then later all at once
-        if(typeof request !== "function") throw new Error("Could not batch request without a handler function!")
-        if(!Array.isArray(this.pipeline)) this.pipeline = [] // init queue
-        this.pipeline.push(Promise.resolve(request.call(this, ...params))) // https://stackoverflow.com/q/60980357/4383587
-    }
-
-
-    async drain(clean = true) { // concurrent execution of all pipelined database requests
-        if(Array.isArray(this.pipeline) && this.pipeline.length > 0) {
-            const response = await Promise.all(this.pipeline)
-            this.pipeline = undefined
-            if(clean === true) {
-                return response
-                    .filter(elem => !!elem && elem.length > 0) // remove empty results
-                    .map(elem => elem.length === 1 ? elem[0] : elem) // unpack findings
-            }
-            return response
-                .map(elem => {
-                    if((elem.length === 0)) return {} // replace empty results
-                    return elem.length === 1 ? elem[0] : elem // unpack findings
-                })
-        }
-        throw new Error("Missing request batch!")
     }
 }
 
