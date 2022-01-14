@@ -74,7 +74,10 @@ class HarperDB {
             return response
         } catch(error) {
             if(!/(not exists?)/gi.test(error.message)) {
-                throw error // propagate error if it resulted not from missing schema/table
+                throw error // propagate error if it didn't yield from a missing schema/table but from something other
+            }
+            if(/^search/i.test(query.operation)) {
+                return [] // don't create missing schema/table just yet, when it's a fetch request!
             }
             let schema
             if(this.schema_undefined) { // prepare schema
