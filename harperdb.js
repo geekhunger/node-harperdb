@@ -143,30 +143,11 @@ class HarperDB {
 
 
     async upsert(records) { // can be a single object or an array
-        records = valid_record(records)
-        let insert_candidate = records.filter(elem => !!elem[this.primary_key])
-        let update_candidate = records.filter(elem => !elem[this.primary_key])
-
-        for(const rec of update_candidate) {
-            if(!rec[this.primary_key]) {
-                this.pipe(this.select, rec)
-            }
-        }
-
-        for(let [pos, findings] of Object.entries(await this.drain())) {
-            if(findings.length === 0 || findings.length > 1) {
-                insert_candidate.push(update_candidate[pos])
-                update_candidate[pos] = undefined
-            } else {
-                update_candidate[pos] = Object.assign(findings[0], update_candidate[pos])
-            }
-        }
-
         return await this.run({
             operation: "upsert",
             schema: this.schema,
             table: this.table,
-            records: [insert_candidate, update_candidate.filter(Boolean)].flat(1) // remove undefined and unpack nested
+            records: valid_record(records)
         })
     }
 
