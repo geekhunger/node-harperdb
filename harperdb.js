@@ -162,8 +162,8 @@ class HarperDB {
     }
 
     
-    async uid(records) {
-        return (await this.select(records)).map(rec => rec[this.primary_key])
+    async uid(filter) {
+        return (await this.select(filter)).map(rec => rec[this.primary_key])
     }
 
 
