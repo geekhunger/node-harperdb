@@ -473,14 +473,91 @@ Fetches the unique identifiers (primary key attribute) of one or more records. M
 
 <br>
 
-- <h3 id="db-pipe"><code>db.pipe(request, ...params)</code></h3>
-- <h3 id="db-drain"><code>db.drain()</code></h3>
+### `db.pipe(req, ...args)` & `db.drain()`
 
+- <h4 id="db-pipe"><code>db.pipe(request, ...params)</code></h4>
 
-```txt
-TODO: finish readme
-TODO: add return value examples
+Sometimes you might want fire many queries in parallel and in the meantime continue with other requests. - For example: You want to insert a couple records into the database and fetch something entirely different, all at the same time.
 
-NOTE: Please be patient, I'm working on it.. ;-)
+Well, you'd need to somehow cache your db operations and run them later with `Promise.all` all at once. But every class method already returns a Promise and it fires the request to HarperDB immediately. So how do you do that?
+
+`db.pipe` is a `Promise` wrapper. You can use it to queue up your requests and and run them later. To run your queued request use [`db.drain()`](#db-drain)!
+
+`db.pipe` will simply wrap every `request` method into a `Promise` and store it inside the `db.pipeline` queue. Once you call `db.drain()`, it will wrap all of those batched requests into a `Promise.all` and send off all of the queued requests at the same time! And finally, it will flush `db.pipeline`.
+
+Requests will execute asynchronously! You can just leave it... or you can 'await' the resolved Promise. It's up to you.
+
+```js
+db.pipe(db.upsert, [ // This is synchronous, so no need to await it...
+    {title: "Hello World", text: "Welcome to my new blog! This..."},
+    {title: "Projects 2022", text: "New year, new luck. 2021 marked..."},
+    {title: "HarperDB: The best database for...", text: "Did you know about HarperDB? Harper..."}
+])
+
+db.drain() // I do not await it, because I don't care about the result at this point...
+
+const users = await db.select("select * from blog.users order by id asc") // In the meantime let's fetch all registred blog users...
+console.log(users)
 ```
+```js
+for(const record of array_of_records) {
+    // do something...
+    db.pipe(db.select, record) // fetch! BUT not just yet.. for now just queue up the request for later
+}
+const findings = await db.drain() // NOW, fetch the all of the results of the queued up requests!
+```
+
+
+<br>
+
+- <h4 id="db-drain"><code>db.drain()</code></h4>
+
+[`db.pipe`](#db-pipe) will save-up queries for later execution. `db.drain` is the finalizer to `db.pipe`!
+
+`db.drain` will wrap all of the single Promises from `db.pipeline` (which were stored there by db.drain) into a new super-mega-wrapped😅 `Promise.all` Promise. It will then execute the queued queries asynchronously all at once and flush the `db.pipeline` array.
+
+The return value (once the Promise is resolve) is an array of responses.
+
+
+
+
+<br>
+
+## SQL queries
+
+This package is largely a wrapper around the available NoSQL operations of the HarperDB API. It was created to provide cleaner and easier syntax for interacting with your HarperDB (Cloud) Instance.
+
+**If execution performance is critical to your application,** I'd suggest you use `{run}` (from module require call) or [`db.request(query)`](#db-request) and pass it a valid SQL statement directly, instead of using methods like `insert`, `update`, `select` and so on.
+
+*`db.request()` has actually this neat shortcut...*
+
+```js
+const {database, run} = require("node-harperdb")
+run("select * from foo.bar limit 1") // equivalent to: db.request("...")
+```
+
+Raw SQL queries have some advantages over NoSQL operations too. You can actually cut on the number of requests that are made to the HarperDB API. Especially, when aggregating data. SQL would be more efficient and convemient at selecting and joining tables than, say, `db.select`. (It also puts the processing load onto your (Cloud) VPS where HarperDB is running, instead of your Web Server.)
+
+> When using SQL statements, you can also safely omit the schema and table settings in the constructor because you need to include them inside your SQL queries anyways! No need for duplication here.^^
+
+```js
+const {database, run} = require("node-harperdb")
+
+// Simpler constructor call
+// with credentials to your HarperDB (Cloud) Instance
+// but without schema and table.
+database("https://url...", "token...")
+
+// Execute SQL statements without db.schema and without db.table
+// run() is equivalent to db.request()
+run("select * from foo.bar limit 1")
+```
+
+
+
+<br>
+
+## TODO
+
+- add return value examples to every class method description
 
