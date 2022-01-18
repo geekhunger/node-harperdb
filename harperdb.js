@@ -1,7 +1,8 @@
 const request = require("needle")
+const {add: vartype, check: type, assert} = require("type-approve")
 
 const valid_record = input => {
-    return Array.isArray(input) || typeof input === "string" ? input : [input]
+    return type({array: input}, {string: input}) ? input : [input]
 }
 
 const valid_json = obj => {
@@ -26,7 +27,7 @@ class HarperDB {
 
 
     async request(query) {
-        const payload = typeof query === "string"
+        const payload = type({string: query})
             ? valid_json({operation: "sql", sql: query})
             : valid_json(query)
         const settings = {
@@ -39,26 +40,24 @@ class HarperDB {
             parse: "json",
             timeout: 15000 // ms
         }
-        const response = (await request("post", this.instance, payload, settings))
-        if(response?.body?.error) throw new Error(response.body.error)
+        const response = await request("post", this.instance, payload, settings)
+        assert(!response?.body?.error, response.body.error)
         return response?.body
     }
 
 
     pipe(request, ...params) { // queue database operations to execute then later all at once
-        if(typeof request !== "function") throw new Error("Could not batch request without a handler function!")
-        if(!Array.isArray(this.pipeline)) this.pipeline = [] // init queue
+        assert(type({function: request}), "Could not batch request without a handler function!")
+        if(!type({array: this.pipeline})) this.pipeline = [] // init queue
         this.pipeline.push(Promise.resolve(request.call(this, ...params))) // https://stackoverflow.com/q/60980357/4383587
     }
 
 
     async drain() { // concurrent execution of all pipelined database requests
-        if(Array.isArray(this.pipeline) && this.pipeline.length > 0) {
-            let response = await Promise.all(this.pipeline)
-            this.pipeline = undefined
-            return response
-        }
-        throw new Error("Missing request batch!")
+        assert(type({array: this.pipeline}) && this.pipeline.length > 0, "Missing request batch!")
+        let response = await Promise.all(this.pipeline)
+        this.pipeline = undefined
+        return response
     }
 
 
@@ -73,9 +72,7 @@ class HarperDB {
             this.schema_undefined = this.table_undefined = false
             return response
         } catch(error) {
-            if(!/(not exists?)/gi.test(error.message)) {
-                throw error // propagate error if it didn't yield from a missing schema/table but from something other
-            }
+            assert(/(not exists?)/gi.test(error.message), error) // propagate error if it didn't yield from a missing schema/table but from something other
             if(/^search/i.test(query.operation)) {
                 return [] // don't create missing schema/table just yet, when it's a fetch request!
             }
@@ -87,7 +84,7 @@ class HarperDB {
                         schema: this.schema
                     })
                 } catch(_) {
-                    await this.request({
+                    await this.request({ // unfortunately, does not return the new schema description (another call might be needed to check the table on it)
                         operation: "create_schema",
                         schema: this.schema
                     }).catch(() => {})
@@ -98,13 +95,13 @@ class HarperDB {
             if(this.table_undefined) { // prepare table
                 try {
                     if(!schema) {
-                        await this.request({
+                        await this.request({ // we don't need the info but if it's throws an error then we know it's missing
                             operation: "describe_table",
                             schema: this.schema,
                             table: this.table
                         })
-                    } else if(!schema[this.table]) {
-                        throw new Error(`Missing table '${this.table}'!`)
+                    } else {
+                        assert(schema[this.table], `Missing table '${this.table}'!`)
                     }
                 } catch(_) {
                     await this.request({
@@ -177,8 +174,6 @@ class HarperDB {
             })
         }
 
-        const is_array = elem => Array.isArray(elem)
-        const is_object = elem => typeof elem === "object" && !is_array(elem)
         let query = {
             operation: "search_by_conditions",
             schema: this.schema,
@@ -190,9 +185,9 @@ class HarperDB {
             limit: undefined // NOTE 'null' doesn't work as stated in docs!
         }
 
-        if(is_object(filter)) {
+        if(type({object: filter})) {
             for(const [attr, val] of Object.entries(filter)) {
-                if(val !== undefined && val !== null) { // TODO This is a temporary workaround. I've submitted a ticket to HarperDB support because it should possible to search for values of null!
+                if(!type({nil: val})) { // TODO This is a temporary workaround. I've submitted a ticket to HarperDB support and they've confirmed that this is a bug! Their suggestion is to use a SQLite SELECT query.
                     query.conditions.push({
                         search_attribute: attr,
                         search_value: val,
@@ -204,7 +199,7 @@ class HarperDB {
             return await this.run(query)
         }
         
-        if(is_array(filter) && filter.every(elem => typeof elem === "string")) {
+        if(type({array: filter}) && filter.every(vartype("string"))) {
             const struct = await this.run({
                 operation: "describe_table",
                 schema: this.schema,
@@ -212,7 +207,7 @@ class HarperDB {
             })
             for(const attr of struct.attributes.map(attr => attr.attribute)) {
                 for(const val of filter) {
-                    if(val !== undefined && val !== null) { // TODO (see ticket)
+                    if(!type({nil: val})) { // TODO (see above note about the bug)
                         query.conditions.push({
                             search_attribute: attr,
                             search_value: val,
@@ -227,38 +222,36 @@ class HarperDB {
             return await this.run(query)
         }
 
-        if(is_array(filter) && filter.every(is_object)) {
+        if(type({array: filter}) && filter.every(vartype("object"))) {
             for(const rec of filter) this.pipe(this.select, rec) // NOTE piping to .select as plain-object (not an array)!
             return (await this.drain()).flat()
         }
 
-        throw new Error("Could not find any records because of malformed filtering!")
+        assert(false, "Could not find any records because of malformed filtering!")
     }
 }
 
 
 module.exports = {
     database: (instance, auth, schema, table) => {
-        if(!(instance && auth) && !!this.db) {
+        if(!type({strings: [instance, auth]}) && type({object: this.db})) { // incomplete or no new credentials but a db instance already exists
             return this.db
         }
-        if((typeof instance !== "string" || typeof auth !== "string") && !this.db) {
-            throw new Error("Invalid credentials!")
-        }
+        assert(type({strings: [instance, auth]}) || type({object: this.db}), "Invalid credentials!")
         this.db = new HarperDB(instance, auth, schema ?? this.db?.schema, table ?? this.db?.table)
         return this.db
     },
 
     mount: (schema, table) => { // alias for swapping namespaces (omit 'new' keyword for class instances)
-        if(typeof schema !== "string") throw new Error("Invalid schema name!")
-        if(typeof table !== "string") [schema, table] = schema.split(".") // support for object-like name chaining: "schema.table"
-        if(typeof table !== "string") throw new Error("Invalid table name!")
+        assert(type({string: schema}), "Invalid schema name!")
+        if(!type({string: table})) [schema, table] = schema.split(".") // support for object-like name chaining: "schema.table"
+        assert(type({string: table}), "Invalid table name!")
         this.db = new HarperDB(this.db?.instance, this.db?.auth, schema, table)
         return this.db
     },
 
     run: query => { // more intuitive alias for running sql queries
-        if(!this.db) throw new Error("Connection invalid!")
+        assert(type({object: this.db}), "Connection invalid!")
         return this.db?.request(query)
     }
 }
