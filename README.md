@@ -14,7 +14,7 @@
 npm i node-harperdb
 ```
 ```js
-const {database, mount, run} = require("node-harperdb")
+const {HarperDB, database, mount, run} = require("node-harperdb")
 ```
 
 > **NOTE:** `db.pipe()` is the only function that is synchronous. Every other class method returns a Promise!
@@ -100,9 +100,22 @@ Now, go back to your project and install this package from NPM: `npm i node-harp
 
 ## Connect to your HarperDB (Cloud) Instance
 
-`require("node-harperdb")` returns an object with three functions `{database, mount, run}`. You don't have to use all of them, but you'll need at least `{database}` constructor.
+`require("node-harperdb")` returns an object with four functions `{HarperDB, database, mount, run}`. You don't have to use all of them, but you'll need at least `{database}` constructor!
 
-Use `database(instance, auth [,schema] [,table])` to connect to your HarperDB Cloud Instance. Use the credentials obtained in ['Preparations'](#preparations) step.
+> `HarperDB` is the underlaying class object. `database(...)` is just a shortcut to `new HarperDB(...)` which lets you omit the `new` keyword. However, when using the shortcut, you can only have **one** single instance of a HarperDB connection at a time! With `new HarperDB`, on the other hand, you can create as many connections as you like. Every one of these instances could for example be connected to a different HarperDB (Cloud) Instance, or just to a different schema and table within the same HarperDB Instance!
+>
+> Another benefit of having `HarperDB` is that you can check a connection with `instanceof HarperDB` is an instance of the HarperDB class.
+>
+> ```js
+> const {HarperDB, database} = require("node-harperdb")
+> const db = database(...)
+> //const db = new HarperDB(...) // or like this
+> console.log(db instanceof HarperDB) // true
+> ```
+
+I think, you will be fine with one class instance most of the time. So, using `database(...)` should be fine.
+
+Use `database(instance, auth [,schema] [,table])` or `new HarperDB(instance, auth [,schema] [,table])` to connect to your HarperDB Cloud Instance. Use the credentials obtained in ['Preparations'](#preparations) step.
 
 ```js
 const {database} = require("node-harperdb")
