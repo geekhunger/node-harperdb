@@ -1,13 +1,17 @@
 const request = require("needle")
 const {add: vartype, check: type, assert} = require("type-approve")
 
+const valid_json = obj => {
+    try {return JSON.stringify(obj)}
+    catch(error) {return null}
+}
+
 const valid_record = input => {
     return type({array: input}, {string: input}) ? input : [input]
 }
 
-const valid_json = obj => {
-    try {return JSON.stringify(obj)}
-    catch(error) {return null}
+const trim_timestamps = records => {
+    valid_record(records).filter(record => !/^__[a-z]+time__$/i.test(record))
 }
 
 
@@ -127,7 +131,7 @@ class HarperDB {
             operation: "insert",
             schema: this.schema,
             table: this.table,
-            records: valid_record(records)
+            records: trim_timestamps(records)
         })
     }
 
@@ -137,7 +141,7 @@ class HarperDB {
             operation: "update",
             schema: this.schema,
             table: this.table,
-            records: valid_record(records)
+            records: trim_timestamps(records)
         })
     }
 
@@ -147,7 +151,7 @@ class HarperDB {
             operation: "upsert",
             schema: this.schema,
             table: this.table,
-            records: valid_record(records)
+            records: trim_timestamps(records)
         })
     }
 
