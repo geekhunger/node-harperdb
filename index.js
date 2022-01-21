@@ -10,8 +10,14 @@ const valid_record = input => {
     return type({array: input}, {string: input}) ? input : [input]
 }
 
-const trim_timestamps = records => {
-    valid_record(records).filter(record => !/^__[a-z]+time__$/i.test(record))
+const trim_records = records => {
+    for(let record of valid_record(records)) {
+        for(const attribute of Object.keys(record)) {
+            if(/^__\w*time__$/i.test(attribute)) { // e.g.: __createdtime__, __updatedtime__
+                delete record[attribute]
+            }
+        }
+    }
 }
 
 
@@ -131,7 +137,7 @@ class HarperDB {
             operation: "insert",
             schema: this.schema,
             table: this.table,
-            records: trim_timestamps(records)
+            records: trim_records(records)
         })
     }
 
@@ -141,7 +147,7 @@ class HarperDB {
             operation: "update",
             schema: this.schema,
             table: this.table,
-            records: trim_timestamps(records)
+            records: trim_records(records)
         })
     }
 
@@ -151,7 +157,7 @@ class HarperDB {
             operation: "upsert",
             schema: this.schema,
             table: this.table,
-            records: trim_timestamps(records)
+            records: trim_records(records)
         })
     }
 
