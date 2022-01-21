@@ -1,6 +1,6 @@
 {
     "private": false,
-    "version": "0.6.9",
+    "version": "0.7.0",
     "name": "node-harperdb",
     "description": "Easy-to-use connector for HarperDB",
     "author": "geekhunger <hallo@geekhunger.de>",
@@ -29,6 +29,6 @@
     ],
     "dependencies": {
         "needle": "^3.0.0",
-        "type-approve": "^0.2.5"
+        "type-approve": "^0.2.8"
     }
 }
