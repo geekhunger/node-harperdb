@@ -25,6 +25,7 @@ const {HarperDB, database, mount, run} = require("node-harperdb")
 - `db.schema`
 - `db.table`
 - `db.primary_key`
+- `db.timeout`
 
 #### Private class properties
 - `db.schema_undefined`
