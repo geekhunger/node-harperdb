@@ -10,14 +10,16 @@ const valid_record = input => {
     return type({array: input}, {string: input}) ? input : [input]
 }
 
-const trim_records = records => {
-    for(let record of valid_record(records)) {
+const trim_records = input => {
+    let records = valid_record(input)
+    for(let record of records) {
         for(const attribute of Object.keys(record)) {
             if(/^__\w*time__$/i.test(attribute)) { // e.g.: __createdtime__, __updatedtime__
                 delete record[attribute]
             }
         }
     }
+    return valid_record(records)
 }
 
 
