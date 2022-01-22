@@ -19,7 +19,7 @@ const trim_records = input => {
             }
         }
     }
-    return valid_record(records)
+    return records
 }
 
 
@@ -38,6 +38,7 @@ class HarperDB {
         this.table = table
         this.primary_key = "id"
         this.schema_undefined = this.table_undefined = true
+        this.timeout = 15000 // ms
     }
 
 
@@ -53,7 +54,7 @@ class HarperDB {
             },
             json: true,
             parse: "json",
-            timeout: 15000 // ms
+            timeout: this.timeout
         }
         const response = await request("post", this.instance, payload, settings)
         assert(!response?.body?.error, response.body.error)
