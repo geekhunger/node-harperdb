@@ -41,7 +41,7 @@ const {HarperDB, database, mount, run} = require("node-harperdb")
 - [`db.upsert(records)`](#db-upsert)
 - [`db.delete(uid)`](#db-delete)
 - [`db.uid(filter)`](#db-uid)
-- [`db.select(filter)`](#db-select)
+- [`db.select(filter, limit)`](#db-select)
 
 #### Private class methods
 - [`db.request(query)`](#db-request)

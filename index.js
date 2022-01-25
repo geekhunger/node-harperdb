@@ -180,7 +180,7 @@ class HarperDB {
     }
 
 
-    async select(filter) { // argument is optional, but could be an object, or an array (of strings or objects)
+    async select(filter, limit) { // argument is optional, but could be an object, or an array (of strings or objects)
         if(!filter) {
             // without filtering attributes, the search will return the table structure
             return await this.run({
@@ -198,7 +198,7 @@ class HarperDB {
             conditions: [],
             operator: "and",
             offset: 0,
-            limit: undefined // NOTE 'null' doesn't work as stated in docs!
+            limit: type({number: limit}) ? parseInt(limit) : undefined // NOTE: Explicit value ot 'null' doesn't work (as stated in docs)! Set to 'undefined' instead.
         }
 
         if(type({object: filter})) {
@@ -239,7 +239,7 @@ class HarperDB {
         }
 
         if(type({array: filter}) && filter.every(vartype("object"))) {
-            for(const rec of filter) this.pipe(this.select, rec) // NOTE piping to .select as plain-object (not an array)!
+            for(const rec of filter) this.pipe(this.select, rec) // piping to this.select as plain-object (not an array)!
             return (await this.drain()).flat()
         }
 
