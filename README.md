@@ -431,10 +431,10 @@ Well, does what is says.^^ Deletes one or more records from the database by thei
 database() // get db handle
 .delete( // call NoSQL delete operation on db
     database() // get db handle
-    .select({ // find records by attributes and values
+    .select([ // find records by attributes and values
         {email: "pepo@gmail.com", fullname: "petric star"},
         {email: "crabs@hotmail.me"}
-    })
+    ])
     .catch(console.error)
 )
 .catch(console.error)
@@ -445,11 +445,11 @@ database() // get db handle
 
 <br>
 
-- <h3 id="db-select"><code>db.select(filter)</code></h3>
+- <h3 id="db-select"><code>db.select(filter, limit)</code></h3>
 
 It's basically a syntactial wrapper around the [search_by_conditions](https://api.harperdb.io/#c820c353-e7f6-4280-aa82-83be77857653) operation of HarperDB.
 
-You pass an array of strings and it does kind of a 'fuzzy search' on the database. Every db entry (and every of its attributes) is compared agains every of your values in the `filter` array, and the results are returned. So, it's basically a: 'contains' this value 'or' this value 'or' that value kind of search...
+You pass an array of strings and it does kind of a 'fuzzy search' on the database... Every db entry (and every of its attributes) is compared agains every of your values in the `filter` array, and the results are returned. So, it's basically a: 'contains' this value 'or' this value 'or' that value kind of search...
 
 ```js
 const db = database(...)
@@ -457,7 +457,7 @@ let findings = await db.select(["attribute contains this sub-string", "hello wor
 console.log(findings)
 ```
 
-You can also pass an object. Then the select will look for an exact match of the given attributes and values on your `filter` object. So, it's basically a: this attribute 'equals' this value 'and' that attribute 'equals' that value...
+You pass an object and the select will look for an *exact* match of the given attributes and value pairs from your `filter` object. So, it's basically a: this attribute 'equals' this value 'and' that attribute 'equals' that value...
 
 ```js
 findings = await db.select({
@@ -466,14 +466,16 @@ findings = await db.select({
 })
 ```
 
-You can also pass an array of objects. The select behaviour will then be the same as with one object. (The request will be asynchronous, meaning, it will not wait sequentially for every search query to finish, but rather run then all in parallel and wait on that Promise to resolve.)
+You can also pass an *array* of objects. (Behind the scenes [db.pipe](#db-pipe) and [db.drain](#db-drain) will be used. The request will be asynchronous, meaning, it will not wait sequentially for every search query to finish, but rather run them all in parallel and wait on that Promise to resolve.)
 
 ```js
-findings = await db.select(
+findings = await db.select([
     {fullname: "Joe McMillan", age: 25}, // trying to find a specific person
     {email: "noreply@pdftoaster.com"} // filtering out all entries with this email address
-)
+])
 ```
+
+*Optinally,* you can also `limit` the number of findings in the response. (Works basically the same as a SQL query: `select * from schema.table where attribute1 = value1 and attribute2 = value2,... LIMIT 25`)
 
 
 <br>
