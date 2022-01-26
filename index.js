@@ -37,7 +37,6 @@ class HarperDB {
         this.schema = schema
         this.table = table
         this.primary_key = "id"
-        this.schema_undefined = this.table_undefined = true
         this.timeout = 15000 // ms
     }
 
@@ -88,7 +87,8 @@ class HarperDB {
             this.schema_undefined = this.table_undefined = false
             return response
         } catch(error) {
-            assert(/(not exists?)/gi.test(error.message), error) // propagate error if it didn't yield from a missing schema/table but from something other
+            assert(/not exist/gi.test(error.message), error) // propagate error if it didn't yield from a missing schema or table but from something other
+            this.schema_undefined = this.table_undefined = true
             if(type({object: query.operation}, {string: query.operation})
             && /^[\r\n\t\s]*search|select/i.test(query.operation))
             {
@@ -105,7 +105,7 @@ class HarperDB {
                     await this.request({ // unfortunately, does not return the new schema description (another call might be needed to check the table on it)
                         operation: "create_schema",
                         schema: this.schema
-                    }).catch(() => {})
+                    })//.catch(() => {})
                 } finally {
                     this.schema_undefined = false
                 }
