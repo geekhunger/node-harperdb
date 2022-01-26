@@ -89,7 +89,9 @@ class HarperDB {
             return response
         } catch(error) {
             assert(/(not exists?)/gi.test(error.message), error) // propagate error if it didn't yield from a missing schema/table but from something other
-            if(/^search/i.test(query.operation)) {
+            if(type({object: query.operation}, {string: query.operation})
+            && /^[\r\n\t\s]*search|select/i.test(query.operation))
+            {
                 return [] // don't create missing schema/table just yet, when it's a fetch request!
             }
             let schema
