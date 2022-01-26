@@ -44,7 +44,7 @@ class HarperDB {
 
     async request(query) {
         const payload = type({string: query})
-            ? valid_json({operation: "sql", sql: query})
+            ? valid_json({operation: "sql", sql: query.trim()})
             : valid_json(query)
         const settings = {
             headers: {
