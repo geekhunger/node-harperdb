@@ -25,8 +25,9 @@ const trim_records = input => {
 const trim_query = function(value) { // trim identation spaces and newlines within multiline strings encosed by ``
     return value
         .trim()
-        .split(/[\r\n]/)
+        .split(/[\r\n]+/)
         .map(line => line.trim())
+        .filter(line => line.length > 0)
         .join(" ")
 }
 
