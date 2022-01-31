@@ -22,6 +22,14 @@ const trim_records = input => {
     return records
 }
 
+const trim_query = function(value) { // trim identation spaces and newlines within multiline strings encosed by ``
+    return value
+        .trim()
+        .split(/[\r\n]/)
+        .map(line => line.trim())
+        .join(" ")
+}
+
 
 class HarperDB {
     /*
@@ -43,7 +51,7 @@ class HarperDB {
 
     async request(query) {
         const payload = type({string: query})
-            ? valid_json({operation: "sql", sql: query.trim()})
+            ? valid_json({operation: "sql", sql: trim_query(query)})
             : valid_json(query)
         const settings = {
             headers: {
