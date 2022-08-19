@@ -31,6 +31,16 @@ const trim_query = function(value) { // trim identation spaces and newlines with
         .join(" ")
 }
 
+const is_search_query = value => {
+    const identifier = /^[\r\n\t\s]*search|select/i
+    if((type({string: value}) && identifier.test(value))
+    || (type({object: value}) && type({string: value.operation}) && identifier.test(value.operation)))
+    {
+        return true
+    }
+    return false
+}
+
 
 class HarperDB {
     /*
@@ -96,13 +106,14 @@ class HarperDB {
             this.schema_undefined = this.table_undefined = false
             return response
         } catch(error) {
-            assert(/not exist/gi.test(error.message), error) // propagate error if it didn't yield from a missing schema or table but from something other
-            this.schema_undefined = this.table_undefined = true
-            if(type({object: query.operation}, {string: query.operation})
-            && /^[\r\n\t\s]*search|select/i.test(query.operation))
+            if(is_search_query(query)
+            && (/not exist/gi.test(error.message)
+            || /unknown attribute/gi.test(error.message)))
             {
                 return [] // don't create missing schema/table just yet, when it's a fetch request!
             }
+            assert(/not exist/gi.test(error.message), error) // propagate error if it didn't yield from a missing schema or table but from something other
+            this.schema_undefined = this.table_undefined = true
             let schema
             if(this.schema_undefined) { // prepare schema
                 try {
