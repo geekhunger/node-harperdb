@@ -114,7 +114,7 @@ class HarperDB {
             }
             assert(/not exist/gi.test(error.message), error) // propagate error if it didn't yield from a missing schema or table but from something other
             this.schema_undefined = this.table_undefined = true
-            let schema
+            let schema, table
             if(this.schema_undefined) { // prepare schema
                 try {
                     schema = await this.request({
@@ -132,15 +132,17 @@ class HarperDB {
             }
             if(this.table_undefined) { // prepare table
                 try {
-                    if(!schema) {
-                        await this.request({ // we don't need the info but if it's throws an error then we know it's missing
+                    if(!schema || !table) {
+                        table = await this.request({
                             operation: "describe_table",
                             schema: this.schema,
                             table: this.table
                         })
                     } else {
                         assert(schema[this.table], `Missing table '${this.table}'!`)
+                        table = schema[this.table]
                     }
+                    this.primary_key = table.hash_attribute // update default primary key with the one that's actually set for this.table
                 } catch(_) {
                     await this.request({
                         operation: "create_table",
