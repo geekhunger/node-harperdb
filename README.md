@@ -2,11 +2,19 @@
 
 > **One word of warning:** I use this package for some of my personal projects and therefore I may introduce breaking changes in future updates (or maybe not 🤗 ). If you plan to use this package in production, you should better fork the Git repo and maintain it yourself!
 
+
+<br>
+<br>
+
 ## Why?
+
+<p align="center"><img src="img/harperdb.png" height="64"></p>
 
 [HarperDB](https://harperdb.io) is a distributed realtime JSON cloud database. It's highly scalable, has low-latency, has dynamic schemas and it's super easy to use and maintain. There are even build-in cloud functions, loadbalancing and other great goodies! Their free tier service plan is certainly capable of running decent applications too. But, their [HTTP API](https://api.harperdb.io) could use some extra love 😘...
 
-<p align="center"><img src="img/harperdb.png" height="64"></p>
+
+<br>
+<br>
 
 ## TL;DR
 
@@ -16,8 +24,29 @@ npm i node-harperdb
 ```js
 const {HarperDB, database, mount, run} = require("node-harperdb")
 ```
+```js
+!async function() {
+    const db = database(
+        "https://foobar-geekhunger.harperdbcloud.com", // Instance-URL
+        "aGFsbG86Z2Vla2h1bmdlcg==" // Basic-Auth Base64 token
+        "production", // db schema (alias namespace)
+        "users" // db table
+    )
 
-> **NOTE:** `db.pipe()` is the only function that is synchronous. Every other class method returns a Promise!
+    await db.insert([
+        {email: "first@user.at"},
+        {email: "second@user.to"}
+    ])
+
+    const users = await db.select()
+
+    console.log(users)
+}()
+```
+
+
+<br>
+<br>
 
 ### Public class properties
 - `db.instance`
@@ -46,34 +75,12 @@ const {HarperDB, database, mount, run} = require("node-harperdb")
 #### Private class methods
 - [`db.request(query)`](#db-request)
 
-<br>
-
-```js
-!async function() {
-    const db = database(
-        "https://foobar-geekhunger.harperdbcloud.com", // Instance-URL
-        "aGFsbG86Z2Vla2h1bmdlcg==" // Basic-Auth Base64 token
-        "production", // db schema (alias namespace)
-        "users" // db table
-    )
-
-    await db.insert([
-        {email: "first@user.at"},
-        {email: "second@user.to"}
-    ])
-
-    const users = await db.select()
-
-    console.log(users)
-}()
-```
-
 
 
 <br>
 <br>
 
-## Preparations
+## Preparation
 
 First, visit [HarperDB Studio](https://studio.harperdb.io) and create your free account (or sign in if you already have one).
 
@@ -523,6 +530,8 @@ for(const record of array_of_records) {
 const findings = await db.drain() // NOW, fetch the all of the results of the queued up requests!
 ```
 
+> **NOTE:** `db.pipe()` is the only function that is synchronous. Every other class method returns a Promise!
+
 
 <br>
 
@@ -568,12 +577,4 @@ database("https://url...", "token...")
 // run() is equivalent to db.request()
 run("select * from foo.bar limit 1")
 ```
-
-
-
-<br>
-
-## TODO
-
-- add return value examples to every class method description
 
