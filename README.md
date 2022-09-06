@@ -1,6 +1,6 @@
 # node-harperdb
 
-> **One word of warning:** I use this package for some of my personal projects and therefore I may introduce breaking changes in future updates (or maybe not 🤗 ). If you plan to use this package in production, you should better fork the Git repo and maintain it yourself!
+> **One word of warning:** I use this package for some of my personal projects and therefore I might introduce breaking changes in future updates (or maybe not 🤗 ). If you plan to use this package in production, you should better fork the Git repo and maintain it yourself!
 
 
 <br>
@@ -49,17 +49,17 @@ const {HarperDB, database, mount, run} = require("node-harperdb")
 <br>
 
 ### Public class properties
-- `db.instance`
-- `db.auth`
-- `db.schema`
-- `db.table`
-- `db.primary_key`
-- `db.timeout`
+- `db.instance` is your HarperDB *Instance URL*
+- `db.auth` is your HarperDB *Instance API Auth* token
+- `db.schema` is your HarperDB schema (could be any realm identifier like a project name)
+- `db.table` is your HarperDB table which holds your records
+- `db.timeout` in milliseconds (default is 1500 ms)
+- `db.primary_key` is the *name* of the primary table column, if you will. Values in this field are guaranteed to be unique identifiers. HarperDB calls it *the table `hash_attribute`*. I call it the `primary_key`. Default name is `'id'`.
 
-#### Private class properties
-- `db.schema_undefined`
-- `db.table_undefined`
-- `db.pipeline`
+#### Private class properties - *DON'T MESS WITH THESE!*
+- `db.schema_undefined` is used as a lookup flag to see if a schema was already defined in your HarperDB instance or not. If it didn't, then it will be created upon the very first occuring request to HarperDB (on that schema).
+- `db.table_undefined` is the same as *db.schema_undefined* but for tables
+- `db.pipeline` is the registry of queued requests - *db.drain()* flushes this array every time
 
 ### Public class methods
 - [`db.pipe(request, ...params)`](#db-pipe)
@@ -95,8 +95,9 @@ Create a new Organization and a new HarperDB Cloud Instance within it. - The Clo
     <img src="img/instance-meta.jpg">
     <img src="img/instance-specs.jpg">
 </div>
+<img src="img/instance-credentials.jpg">
 
-Once you have your Instance (it takes a moment), switch to the 'config' tab and grab your Instance-URL and Basic-Auth token.
+Once you have your Instance (it takes a moment), switch to the 'config' tab and grab your *Instance URL* and *Instance API Auth* token.
 
 Now, go back to your project and install this package from NPM: `npm i node-harperdb`
 
@@ -201,12 +202,19 @@ const response = await db.request({
     "sql": "SELECT * FROM dev.dog WHERE id = 1"
 })
 ```
+```js
+// run a SQLite query WITHOUT HARDCODING the schema and table names!
+const response = await db.request({
+    "operation": "sql",
+    "sql": `SELECT * FROM ${db.schema}.${db.table} WHERE id = 1`
+})
+```
 
 This is were Strings come in... If `query` argument is a String then it will be interpreted as a [raw SQL statements](https://harperdb.io/docs/sql-overview)! (*Yes,* you have the **full power of SQLite** at your desposal!) `db.request` will wrap the string into an object (as shown in previous example) and send if off.
 
 ```js
 // here's the exact same SQLite query but simpler...
-const response = await db.request("SELECT * FROM dev.dog WHERE id = 1")
+const response = await db.request(`SELECT * FROM ${db.schema}.${db.table} WHERE id = 1`)
 console.log(response)
 ```
 
@@ -236,7 +244,7 @@ db.request({
 
 - <h3 id="db-run"><code>db.run(query)</code></h3>
 
-Very similar to `db.request` but with one key difference: **It prepares the database table before running queries on it!** - For example, if you were to execute `db.insert()` on a missing schema and/or table, then this function would 🪄automagically create them *and then* run your request on it.
+Very similar to `db.request` but with one key difference: **It prepares the database table before running queries on it!** - For example, if you were to execute `db.insert()` on a missing schema and/or table, then this function would 🪄automagically create them *and then* run your request on it. (*db.request* would simply error, saying that the schema/table is missing.)
 
 > Obviously, the schema and table would *not* be created just yet, if it's a read request, like 'search_by_conditions'. Namespaces are only auto-created on write operations like 'insert'.
 
@@ -432,7 +440,9 @@ database()
 
 - <h3 id="db-delete"><code>db.delete(uid)</code></h3>
 
-Well, does what is says.^^ Deletes one or more records from the database by their UIDs. [(See official docs.)](https://api.harperdb.io/#beaf5116-ad34-4360-bdc2-608e2743a514)
+Well, does what is says.^^ Deletes one or more records from the database by their UIDs. [(See an example from official docs.)](https://api.harperdb.io/#beaf5116-ad34-4360-bdc2-608e2743a514)
+
+The fallowing example fetches records by certain conditions and passes those records directly to the `db.delete` method for deletion.
 
 ```js
 database() // get db handle
@@ -448,6 +458,16 @@ database() // get db handle
 .then(console.log)
 ```
 
+It's possible to fetch UIDs explicitly and pass *them* to the deletion method. In the fallowing example, `db.uid()` will perform a *db.select()* to fetch records of interest and then map each record to its *primary_key*. The result is an array of UIDs for the matching records. Eventually, we pass those *ids* to *db.delete()* for deletion.
+
+```js
+const ids = database().uid([
+    {email: "pepo@gmail.com", fullname: "petric star"},
+    {email: "crabs@hotmail.me"}
+])
+database().delete(ids)
+```
+
 
 
 <br>
@@ -456,7 +476,7 @@ database() // get db handle
 
 It's basically a syntactial wrapper around the [search_by_conditions](https://api.harperdb.io/#c820c353-e7f6-4280-aa82-83be77857653) operation of HarperDB.
 
-You pass an array of strings and it does kind of a 'fuzzy search' on the database... Every db entry (and every of its attributes) is compared agains every of your values in the `filter` array, and the results are returned. So, it's basically a: 'contains' this value 'or' this value 'or' that value kind of search...
+You pass an array of strings and it does kind of a 'fuzzy search' on the database... Every db entry (and every of its attributes) will be compared agains every of your values in the `filter` array, and the results will be returned. So, it's basically an operation that sounds like this: attribute 'id' does 'contains' the value 'hello world' 'or' attribute 'fullname' does 'contains' the value 'hello world' 'or' ... and so on. It tries to match every attribute in db agains every value in your list. Thank kind of search...😅
 
 ```js
 const db = database(...)
@@ -464,7 +484,7 @@ let findings = await db.select(["attribute contains this sub-string", "hello wor
 console.log(findings)
 ```
 
-You pass an object and the select will look for an *exact* match of the given attributes and value pairs from your `filter` object. So, it's basically a: this attribute 'equals' this value 'and' that attribute 'equals' that value...
+If you pass an object (instead of an array of strings), then the select method will look for an *exact* match of the given attributes and value pairs from your `filter` object. So, it's basically a: this attribute 'equals' this value 'and' that attribute 'equals' that value...
 
 ```js
 findings = await db.select({
@@ -473,7 +493,7 @@ findings = await db.select({
 })
 ```
 
-You can also pass an *array* of objects. (Behind the scenes [db.pipe](#db-pipe) and [db.drain](#db-drain) will be used. The request will be asynchronous, meaning, it will not wait sequentially for every search query to finish, but rather run them all in parallel and wait on that Promise to resolve.)
+You can also pass an *array* of objects. (Behind the scenes [db.pipe](#db-pipe) and [db.drain](#db-drain) will be used. The request will be asynchronous, meaning, it will not wait sequentially for every search query to finish, but rather run them all in parallel and wait on that bigger Promise to resolve.)
 
 ```js
 findings = await db.select([
@@ -482,14 +502,55 @@ findings = await db.select([
 ])
 ```
 
-*Optinally,* you can also `limit` the number of findings in the response. (Works basically the same as a SQL query: `select * from schema.table where attribute1 = value1 and attribute2 = value2,... LIMIT 25`)
+*Optinally,* you can also `limit` the number of findings in the response with every described variant. (Works basically the same as a SQL query: `select * from schema.table where attribute1 = value1 and attribute2 = value2,... LIMIT 25`)
+
+Another interesting and useful but very confusing and ugly looking variant of db.select is to filter database records by nested JS objects or arrays...
+
+For example: You have a 'user' table with primary_key named 'id'. The 'id' attribute contains a username which is globally unique. Every user has a 'roles' attribute **which is an array** of strings.
+
+#### Selection filter from nested objects and arrays
+
+Sometimes you'll need to select records filtered by attributes that contain an object or array. [Please refer to the SEARCH_JSON documentation (but be warned, it's a very ugly syntax^^).](https://harperdb.io/docs/sql-overview/sql-json-search)
+
+Here's an example, if you want to select users from the database by their usernames. Note, this is pure SQL syntax.
+
+```js
+function selectUsersByUsernames(usernames) {
+    return db.run(`select * from ${db.schema}.${db.table} where ${db.primary_key} in (${usernames.map(name => `"${name}"`).join(",")})`)
+}
+
+selectUsersByUsernames(["babyface777", "rosebud", "geekhunger"])
+.catch(console.error)
+.then(console.log)
+```
+
+If you'd want to select e.g. by roles instead, and the *roles* attribute is an array of strings in your database, then try something like this:
+
+```js
+function selectUsersByRoles(list) {
+    return db.run(`select * from ${db.schema}.${db.table} where search_json('$[$ in ${JSON.stringify(list)}]', roles)`)
+}
+
+selectUsersByRoles(["admin", "manager", "supervisor"])
+.catch(console.error)
+.then(console.log)
+```
 
 
 <br>
 
 - <h3 id="db-uid"><code>db.uid(filter)</code></h3>
 
-Fetches the unique identifiers (primary key attribute) of one or more records. Mostly useful when you want to update or delete some db entries. [(You can explore more details here.)](https://api.harperdb.io/#beaf5116-ad34-4360-bdc2-608e2743a514)
+Fetches the unique identifiers of one or more records (in other words, the attribute value with the *name* `db.primary_key`). Mostly useful when you want to update or delete some entries in your database. [(You can explore more details in the official docs.)](https://api.harperdb.io/#beaf5116-ad34-4360-bdc2-608e2743a514)
+
+```js
+database()
+.uid([
+    {email: "crabs@hotmail.me"}
+])
+.catch(console.error)
+.then(console.log)
+```
 
 
 
