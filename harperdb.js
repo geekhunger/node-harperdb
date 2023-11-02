@@ -1,13 +1,24 @@
-const request = require("needle")
-const {add: vartype, check: type, assert} = require("type-approve")
+import {request} from "needle"
+import vartype from "type-approve"
+
+const {
+    add: getTypeValidationHandler,
+    check: type,
+    assert
+} = vartype
 
 const valid_json = obj => {
-    try {return JSON.stringify(obj)}
-    catch(error) {return null}
+    try {
+        return JSON.stringify(obj)
+    } catch(error) {
+        return null
+    }
 }
 
 const valid_record = input => {
-    return type({array: input}, {string: input}) ? input : [input]
+    return type({array: input}, {string: input})
+        ? input
+        : [input]
 }
 
 const trim_records = input => {
@@ -41,8 +52,7 @@ const is_search_query = value => {
     return false
 }
 
-
-class HarperDB {
+export class HarperDB {
     /*
         HarperDB connector
         Class instances 'mount' onto a db schema (namespace) and table to run queries on them
@@ -239,7 +249,7 @@ class HarperDB {
             return await this.run(query)
         }
         
-        if(type({array: filter}) && filter.every(vartype("string"))) {
+        if(type({array: filter}) && filter.every(getTypeValidationHandler("string"))) {
             const struct = await this.run({
                 operation: "describe_table",
                 schema: this.schema,
@@ -262,7 +272,7 @@ class HarperDB {
             return await this.run(query)
         }
 
-        if(type({array: filter}) && filter.every(vartype("object"))) {
+        if(type({array: filter}) && filter.every(getTypeValidationHandler("object"))) {
             for(const rec of filter) this.pipe(this.select, rec) // piping to this.select as plain-object (not an array)!
             return (await this.drain()).flat()
         }
@@ -271,28 +281,4 @@ class HarperDB {
     }
 }
 
-
-module.exports = {
-    HarperDB,
-    database: (instance, auth, schema, table) => {
-        if(!type({strings: [instance, auth]}) && type({object: this.db})) { // incomplete or no new credentials but a db instance already exists
-            return this.db
-        }
-        assert(type({strings: [instance, auth]}) || type({object: this.db}), "Invalid credentials!")
-        this.db = new HarperDB(instance, auth, schema ?? this.db?.schema, table ?? this.db?.table)
-        return this.db
-    },
-
-    mount: (schema, table) => { // alias for swapping namespaces (omit 'new' keyword for class instances)
-        assert(type({string: schema}), "Invalid schema name!")
-        if(!type({string: table})) [schema, table] = schema.split(".") // support for object-like name chaining: "schema.table"
-        assert(type({string: table}), "Invalid table name!")
-        this.db = new HarperDB(this.db?.instance, this.db?.auth, schema, table)
-        return this.db
-    },
-
-    run: query => { // more intuitive alias for running sql queries
-        assert(type({object: this.db}), "Connection invalid!")
-        return this.db?.request(query)
-    }
-}
+export default HarperDB
