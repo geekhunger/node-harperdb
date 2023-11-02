@@ -1,11 +1,12 @@
 {
-    "private": false,
-    "version": "0.8.2",
     "name": "node-harperdb",
-    "description": "Easy-to-use connector for HarperDB",
-    "author": "geekhunger <hallo@geekhunger.de>",
+    "description": "NodeJS/ExpressJS connector for HarperDB",
+    "main": "connector.js",
+    "type": "module",
+    "version": "1.0.0",
+    "private": false,
+    "author": "geekhunger <hello@geekhunger.com>",
     "license": "MIT",
-    "main": "index.js",
     "homepage": "https://github.com/geekhunger/node-harperdb#readme",
     "repository": {
         "type": "git",
@@ -28,7 +29,7 @@
         "adapter"
     ],
     "dependencies": {
-        "needle": "^3.0.0",
-        "type-approve": "^0.2.8"
+        "needle": "^3.2.0",
+        "type-approve": "^0.3.0"
     }
 }
