@@ -1,5 +1,6 @@
 # node-harperdb
 
+> **Note:** If you need an alternative, there's [harperive](https://www.npmjs.com/package/harperive).
 > **One word of warning:** I use this package for some of my personal projects and therefore I might introduce breaking changes in future updates (or maybe not 🤗 ). If you plan to use this package in production, you should better fork the Git repo and maintain it yourself!
 
 
