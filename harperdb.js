@@ -57,15 +57,15 @@ export class HarperDB {
         HarperDB connector
         Class instances 'mount' onto a db schema (namespace) and table to run queries on them
     */
-    constructor(instance, auth, schema, table) {
+    constructor(url, token, schema, table, primekey = "id") {
         if(!(this instanceof HarperDB)) {
-            return new HarperDB(instance, auth, schema, table)
+            return new HarperDB(url, token, schema, table)
         }
-        this.instance = instance
-        this.auth = auth
+        this.url = url
+        this.token = token
         this.schema = schema
         this.table = table
-        this.primary_key = "id"
+        this.primekey = primekey
         this.timeout = 15000 // ms
     }
 
@@ -78,14 +78,15 @@ export class HarperDB {
             headers: {
                 "Accept": "application/json",
                 "Cache-Control": "no-cache",
-                "Authorization": "Basic " + this.auth
+                "Authorization": "Basic " + this.token
             },
             json: true,
             parse: "json",
             timeout: this.timeout
         }
-        const response = await request("post", this.instance, payload, settings)
-        assert(!response?.body?.error, response.body.error)
+        const response = await request("post", this.url, payload, settings)
+        console.log(response)
+        assert(!response?.body?.error, response?.body?.error)
         return response?.body
     }
 
@@ -112,30 +113,35 @@ export class HarperDB {
             NOTE The first call will create missing schema and/or table recursevly!
         */
         try {
+            console.log(await this.request({operation: "describe_all"}))
             const response = await this.request(query)
-            this.schema_undefined = this.table_undefined = false
-            return response
+            if(response) {
+                this.schema_undefined = this.table_undefined = false
+                return response
+            }
+            assert(this.schema_undefined === false && this.table_undefined === false, "Schema or table does not exist!")
         } catch(error) {
             if(is_search_query(query)
-            && (/not exist/gi.test(error.message)
-            || /unknown attribute/gi.test(error.message)))
+            && (/not exist/gi.test(error?.message || error)
+            || /unknown attribute/gi.test(error?.message || error)))
             {
                 return [] // don't create missing schema/table just yet, when it's a fetch request!
             }
-            assert(/not exist/gi.test(error.message), error) // propagate error if it didn't yield from a missing schema or table but from something other
+            assert(/not exist/gi.test(error?.message || error), error) // propagate error if it didn't yield from a missing schema or table but from something other
             this.schema_undefined = this.table_undefined = true
             let schema, table
             if(this.schema_undefined) { // prepare schema
                 try {
                     schema = await this.request({
-                        operation: "describe_schema",
-                        schema: this.schema
+                        operation: "describe_database",
+                        database: this.schema
                     })
+                    assert(!type({nil: schema}), "Schema does not exist!")
                 } catch(_) {
                     await this.request({ // unfortunately, does not return the new schema description (another call might be needed to check the table on it)
-                        operation: "create_schema",
-                        schema: this.schema
-                    })//.catch(() => {})
+                        operation: "create_database",
+                        database: this.schema
+                    }).catch(() => {})
                 } finally {
                     this.schema_undefined = false
                 }
@@ -145,34 +151,39 @@ export class HarperDB {
                     if(!schema || !table) {
                         table = await this.request({
                             operation: "describe_table",
-                            schema: this.schema,
+                            database: this.schema,
                             table: this.table
                         })
+                        console.log("!!!", table)
+                        assert(!type({nil: table}), "Table does not exist!")
                     } else {
                         assert(schema[this.table], `Missing table '${this.table}'!`)
                         table = schema[this.table]
                     }
-                    this.primary_key = table.hash_attribute // update default primary key with the one that's actually set for this.table
+                    this.primekey = table.hash_attribute // update default primary key with the one that's actually set for this.table
                 } catch(_) {
                     await this.request({
                         operation: "create_table",
-                        schema: this.schema,
+                        database: this.schema,
                         table: this.table,
-                        hash_attribute: this.primary_key // default name of the uuid column
+                        hash_attribute: this.primekey // default name of the uuid column
                     }).catch(() => {})
                 } finally {
                     this.table_undefined = false
                 }
             }
+            console.log(this.schema_undefined, this.table_undefined, schema, table)
+        } finally {
+            await this.request(query) // retry
+            console.log("try again:", query)
         }
-        return await this.request(query) // retry
     }
 
 
     async insert(records) { // can be a single object or an array
         return await this.run({
             operation: "insert",
-            schema: this.schema,
+            database: this.schema,
             table: this.table,
             records: trim_records(records)
         })
@@ -182,7 +193,7 @@ export class HarperDB {
     async update(records) { // can be a single object or an array
         return await this.run({
             operation: "update",
-            schema: this.schema,
+            database: this.schema,
             table: this.table,
             records: trim_records(records)
         })
@@ -192,7 +203,7 @@ export class HarperDB {
     async upsert(records) { // can be a single object or an array
         return await this.run({
             operation: "upsert",
-            schema: this.schema,
+            database: this.schema,
             table: this.table,
             records: trim_records(records)
         })
@@ -202,7 +213,7 @@ export class HarperDB {
     async detete(uid) { // can be a single string or an array
         return await this.run({
             operation: "delete",
-            schema: this.schema,
+            database: this.schema,
             table: this.table,
             hash_values: valid_record(uid)
         })
@@ -210,7 +221,7 @@ export class HarperDB {
 
     
     async uid(filter) {
-        return (await this.select(filter)).map(rec => rec[this.primary_key])
+        return (await this.select(filter)).map(rec => rec[this.primekey])
     }
 
 
@@ -219,14 +230,14 @@ export class HarperDB {
             // without filtering attributes, the search will return the table structure
             return await this.run({
                 operation: "describe_table",
-                schema: this.schema,
+                database: this.schema,
                 table: this.table
             })
         }
 
         let query = {
             operation: "search_by_conditions",
-            schema: this.schema,
+            database: this.schema,
             table: this.table,
             get_attributes: ["*"],
             conditions: [],
@@ -252,7 +263,7 @@ export class HarperDB {
         if(type({array: filter}) && filter.every(getTypeValidationHandler("string"))) {
             const struct = await this.run({
                 operation: "describe_table",
-                schema: this.schema,
+                database: this.schema,
                 table: this.table
             })
             for(const attr of struct.attributes.map(attr => attr.attribute)) {
