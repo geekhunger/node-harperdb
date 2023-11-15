@@ -131,7 +131,6 @@ export class HarperDB {
                     }
                     this.primekey = table.hash_attribute // update default primary key with the one that's actually set for this.table
                 } catch(_) {
-                    console.log("!!!", this.primekey)
                     await this.request({
                         operation: "create_table",
                         schema: this.schema,
