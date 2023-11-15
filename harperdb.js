@@ -1,104 +1,84 @@
-import {request} from "needle"
-import vartype from "type-approve"
+import {
+    type,
+    add as typecheck,
+    assert,
+    validJson,
+    validPayload,
+    removeTimestamps,
+    trimQuery,
+    isSearchQuery
+} from "./utility.js"
 
-const {
-    add: getTypeValidationHandler,
-    check: type,
-    assert
-} = vartype
-
-const valid_json = obj => {
-    try {
-        return JSON.stringify(obj)
-    } catch(error) {
-        return null
-    }
-}
-
-const valid_record = input => {
-    return type({array: input}, {string: input})
-        ? input
-        : [input]
-}
-
-const trim_records = input => {
-    let records = valid_record(input)
-    for(let record of records) {
-        for(const attribute of Object.keys(record)) {
-            if(/^__\w*time__$/i.test(attribute)) { // e.g.: __createdtime__, __updatedtime__
-                delete record[attribute]
-            }
-        }
-    }
-    return records
-}
-
-const trim_query = function(value) { // trim identation spaces and newlines within multiline strings encosed by ``
-    return value
-        .trim()
-        .split(/[\r\n]+/)
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-        .join(" ")
-}
-
-const is_search_query = value => {
-    const identifier = /^[\r\n\t\s]*search|select/i
-    if((type({string: value}) && identifier.test(value))
-    || (type({object: value}) && type({string: value.operation}) && identifier.test(value.operation)))
-    {
-        return true
-    }
-    return false
-}
+import request from "needle"
 
 export class HarperDB {
     /*
         HarperDB connector
         Class instances 'mount' onto a db schema (namespace) and table to run queries on them
     */
-    constructor(instance, auth, schema, table) {
+    constructor(url, token, schema, table, primekey = "id", timeout = 15000) {
         if(!(this instanceof HarperDB)) {
-            return new HarperDB(instance, auth, schema, table)
+            return new HarperDB(url, token, schema, table)
         }
-        this.instance = instance
-        this.auth = auth
+        this.url = url
+        this.token = token
         this.schema = schema
         this.table = table
-        this.primary_key = "id"
-        this.timeout = 15000 // ms
+        this.primekey = primekey
+        this.timeout = timeout // ms
     }
 
 
     async request(query) {
         const payload = type({string: query})
-            ? valid_json({operation: "sql", sql: trim_query(query)})
-            : valid_json(query)
+            ? validJson({operation: "sql", sql: trimQuery(query)})
+            : validJson(query)
         const settings = {
             headers: {
                 "Accept": "application/json",
                 "Cache-Control": "no-cache",
-                "Authorization": "Basic " + this.auth
+                "Authorization": "Basic " + this.token
             },
             json: true,
             parse: "json",
             timeout: this.timeout
         }
-        const response = await request("post", this.instance, payload, settings)
-        assert(!response?.body?.error, response.body.error)
-        return response?.body
+        try {
+            const response = await request("post", this.url, payload, settings)
+            assert(
+                type({object: response}) &&
+                type({nil: response.body?.error}) &&
+                response.statusCode >= 200 &&
+                response.statusCode <= 299,
+                response.body?.error || response.body?.message || response.body || "No response!"
+            )
+            return response.body
+        } catch(exception) {
+            throw exception
+        }
     }
 
 
     pipe(request, ...params) { // queue database operations to execute then later all at once
-        assert(type({function: request}), "Could not batch request without a handler function!")
-        if(!type({array: this.pipeline})) this.pipeline = [] // init queue
-        this.pipeline.push(Promise.resolve(request.call(this, ...params))) // https://stackoverflow.com/q/60980357/4383587
+        assert(
+            type({function: request}),
+            "Could not batch request without a handler function!"
+        )
+        if(!type({array: this.pipeline})) {
+            this.pipeline = [] // init queue
+        }
+        this.pipeline.push(
+            Promise.resolve(request.call(this, ...params)) // https://stackoverflow.com/q/60980357/4383587
+        )
     }
 
 
     async drain() { // concurrent execution of all pipelined database requests
-        assert(type({array: this.pipeline}) && this.pipeline.length > 0, "Missing request batch!")
+        assert(
+            type({array: this.pipeline}) &&
+            this.pipeline.length > 0,
+            "Missing request batch!"
+        )
         let response = await Promise.all(this.pipeline)
         this.pipeline = undefined
         return response
@@ -116,11 +96,8 @@ export class HarperDB {
             this.schema_undefined = this.table_undefined = false
             return response
         } catch(error) {
-            if(is_search_query(query)
-            && (/not exist/gi.test(error.message)
-            || /unknown attribute/gi.test(error.message)))
-            {
-                return [] // don't create missing schema/table just yet, when it's a fetch request!
+            if(isSearchQuery(query) && (/not exist/gi.test(error.message) || /unknown attribute/gi.test(error.message))) {
+                return [] // don't create missing schema/table just yet, when it's not a write- but a read request!
             }
             assert(/not exist/gi.test(error.message), error) // propagate error if it didn't yield from a missing schema or table but from something other
             this.schema_undefined = this.table_undefined = true
@@ -132,10 +109,10 @@ export class HarperDB {
                         schema: this.schema
                     })
                 } catch(_) {
-                    await this.request({ // unfortunately, does not return the new schema description (another call might be needed to check the table on it)
+                    await this.request({ // unfortunately, does not return the new schema description, another call might be needed to check the table on it
                         operation: "create_schema",
                         schema: this.schema
-                    })//.catch(() => {})
+                    }).catch(() => {})
                 } finally {
                     this.schema_undefined = false
                 }
@@ -152,13 +129,14 @@ export class HarperDB {
                         assert(schema[this.table], `Missing table '${this.table}'!`)
                         table = schema[this.table]
                     }
-                    this.primary_key = table.hash_attribute // update default primary key with the one that's actually set for this.table
+                    this.primekey = table.hash_attribute // update default primary key with the one that's actually set for this.table
                 } catch(_) {
+                    console.log("!!!", this.primekey)
                     await this.request({
                         operation: "create_table",
                         schema: this.schema,
                         table: this.table,
-                        hash_attribute: this.primary_key // default name of the uuid column
+                        hash_attribute: this.primekey // default name of the uuid column
                     }).catch(() => {})
                 } finally {
                     this.table_undefined = false
@@ -174,7 +152,7 @@ export class HarperDB {
             operation: "insert",
             schema: this.schema,
             table: this.table,
-            records: trim_records(records)
+            records: removeTimestamps(records)
         })
     }
 
@@ -184,7 +162,7 @@ export class HarperDB {
             operation: "update",
             schema: this.schema,
             table: this.table,
-            records: trim_records(records)
+            records: removeTimestamps(records)
         })
     }
 
@@ -194,7 +172,7 @@ export class HarperDB {
             operation: "upsert",
             schema: this.schema,
             table: this.table,
-            records: trim_records(records)
+            records: removeTimestamps(records)
         })
     }
 
@@ -204,20 +182,19 @@ export class HarperDB {
             operation: "delete",
             schema: this.schema,
             table: this.table,
-            hash_values: valid_record(uid)
+            hash_values: validPayload(uid)
         })
     }
 
     
     async uid(filter) {
-        return (await this.select(filter)).map(rec => rec[this.primary_key])
+        return (await this.select(filter)).map(rec => rec[this.primekey])
     }
 
 
     async select(filter, limit) { // argument is optional, but could be an object, or an array (of strings or objects)
         if(!filter) {
-            // without filtering attributes, the search will return the table structure
-            return await this.run({
+            return await this.run({ // without filtering attributes, the search will return the table structure
                 operation: "describe_table",
                 schema: this.schema,
                 table: this.table
@@ -232,7 +209,7 @@ export class HarperDB {
             conditions: [],
             operator: "and",
             offset: 0,
-            limit: type({number: limit}) ? parseInt(limit) : undefined // NOTE: Explicit value ot 'null' doesn't work (as stated in docs)! Set to 'undefined' instead.
+            limit: type({number: limit}) ? parseInt(limit) : undefined // NOTE: Explicit value ot 'null' doesn't work, as stated in docs! Set to 'undefined' instead.
         }
 
         if(type({object: filter})) {
@@ -249,7 +226,7 @@ export class HarperDB {
             return await this.run(query)
         }
         
-        if(type({array: filter}) && filter.every(getTypeValidationHandler("string"))) {
+        if(type({array: filter}) && filter.every(typecheck("string"))) {
             const struct = await this.run({
                 operation: "describe_table",
                 schema: this.schema,
@@ -272,8 +249,10 @@ export class HarperDB {
             return await this.run(query)
         }
 
-        if(type({array: filter}) && filter.every(getTypeValidationHandler("object"))) {
-            for(const rec of filter) this.pipe(this.select, rec) // piping to this.select as plain-object (not an array)!
+        if(type({array: filter}) && filter.every(typecheck("object"))) {
+            for(const rec of filter) {
+                this.pipe(this.select, rec) // piping to this.select as plain-object (not an array)!
+            }
             return (await this.drain()).flat()
         }
 
