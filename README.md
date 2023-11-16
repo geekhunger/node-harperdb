@@ -502,7 +502,13 @@ Here's an example, if you want to select users from the database by their userna
 
 ```js
 function selectUsersByUsernames(usernames) {
-    return db.run(`select * from ${db.schema}.${db.table} where ${db.primekey} in (${usernames.map(name => `"${name}"`).join(",")})`)
+    return db.run(`
+        select *
+        from ${db.schema}.${db.table}
+        where ${db.primekey} in (
+            ${usernames.map(name => `"${name}"`).join(",")}
+        )
+    `)
 }
 
 selectUsersByUsernames(["babyface777", "rosebud", "geekhunger"])
@@ -514,7 +520,11 @@ If you'd want to select e.g. by roles instead, and the *roles* attribute is an a
 
 ```js
 function selectUsersByRoles(list) {
-    return db.run(`select * from ${db.schema}.${db.table} where search_json('$[$ in ${JSON.stringify(list)}]', roles)`)
+    return db.run(`
+        select *
+        from ${db.schema}.${db.table}
+        where search_json('$[$ in ${JSON.stringify(list)}]', roles)
+    `)
 }
 
 selectUsersByRoles(["admin", "manager", "supervisor"])
