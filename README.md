@@ -13,7 +13,7 @@
 
 ## Why?
 
-[HarperDB](https://harperdb.io) is a distributed realtime JSON cloud database. It's highly scalable, has low-latency, has dynamic schemas and it's super easy to use and maintain. There are even build-in cloud functions, loadbalancing and other great goodies! Their free tier service plan is certainly capable of running decent applications too. But, their [HTTP API](https://api.harperdb.io) could use some extra love 😘...
+[HarperDB](https://harperdb.io) is a distributed realtime JSON cloud database. It's highly scalable, low-latency, has dynamic schemas and is super easy to use and maintain. There are even build-in cloud functions, build-in loadbalancing and other great goodies! The free tier service plan is certainly capable of running decent applications too. Have a look at the [HTTP API](https://api.harperdb.io) for more details.
 
 
 <br>
@@ -89,22 +89,21 @@ First, visit [HarperDB Studio](https://studio.harperdb.io) and create your free 
 
 Create a new Organization and a new HarperDB Cloud Instance within it. - The Cloud Instance is sort of your VPS that is hosting your installation of HarperDB. You can have one for free, with fixed specs; additional Instances need to be paid separately.
 
-<div>
-    <img src="img/instance-create.jpg">
-    <img src="img/instance-preview.jpg">
-</div>
+<img src="img/instance-create.jpg">
+<br>
+<img src="img/instance-preview.jpg">
+<br>
 <img src="img/instance-plan.jpg">
-<div>
-    <img src="img/instance-meta.jpg">
-    <img src="img/instance-specs.jpg">
-</div>
-<img src="img/instance-credentials.jpg">
+<br>
+<img src="img/instance-meta.jpg">
+<br>
+<img src="img/instance-specs.jpg">
 
 Once you have your Instance (it takes a moment), switch to the 'config' tab and grab your *Instance URL* and *Instance API Auth* token.
 
+<img src="img/instance-credentials.jpg">
+
 Now, go back to your project and install this package from NPM: `npm i node-harperdb`
-
-
 
 
 <br>
@@ -112,7 +111,7 @@ Now, go back to your project and install this package from NPM: `npm i node-harp
 
 ## Connect to your HarperDB (Cloud) Instance
 
-`await import("node-harperdb")` returns an object with three functions `{HarperDB, connect, run}`. You don't have to use all of them, but you'll need at least `{connect}` or `{HarperDB}` constructor!
+`await import("node-harperdb")` returns an object with three functions `{HarperDB, connect, run}`. You don't have to use all of them, but you'll need at least the `{connect}` *or* `{HarperDB}` constructor!
 
 > `HarperDB` is the underlaying class object. `connect(...)` is just a shortcut to `new HarperDB(...)` which lets you omit the `new` keyword. However, when using this shortcut, you can only have **one** single instance of a HarperDB connection at a time! With `new HarperDB`, on the other hand, you can create as many connections as you like. Every one of these instances could for example be connected to a different HarperDB (Cloud) Instance, or just to a different schema and table within the same HarperDB Instance!
 >
@@ -125,52 +124,34 @@ Now, go back to your project and install this package from NPM: `npm i node-harp
 > console.log(db instanceof HarperDB) // true
 > ```
 
-I think, you will be fine with one class instance most of the time. So, using `connect(...)` should be fine.
+Use `connect(url, token, schema, table [, primekey, timeout])` or `new HarperDB(url, token, schema, table [, primekey, timeout])` to connect to your HarperDB Cloud Instance. Use the credentials obtained in ['Preparations'](#preparations) step.
 
-Use `connect(url, token, schema, table)` or `new HarperDB(url, token, schema ,table)` to connect to your HarperDB Cloud Instance. Use the credentials obtained in ['Preparations'](#preparations) step.
+Using `connect(...)` should be fine most of the time. If you need to work with more than one database table at the same time, then use `new HarperDB(...)`.
 
 ```js
 import {connect} from "node-harperdb"
-const db = connect("https://foobar-geekhunger.harperdbcloud.com", "aGFsbG22Z2vla2m1bmdMc0==")
+const db = new HarperDB("https://foobar-geekhunger.harperdbcloud.com", "aGFsbG22Z2vla2m1bmdMc0==", "foo", "bar")
 ```
 
 > The constructor does not actually 'connect' to a server via sockets or something... not immediately at least. It simply stores your credentials inside `db.url` (URL) and `db.token` (Basic-Auth token) properties and uses those values in the HTTP requests that it makes to HarperDB HTTP API. You can swap out credendials, schema or table at any time, without worrying about opening or closing any connections, because there is really no connection until you fire your request.
 
 The return value of the constructor is a handle to the class instance (of the underlaying HarperDB class), on which you call methods like insert, update, select and so on. (See the [list of available class methods](#class-methods) below, for detailed information on each method.)
 
-- When calling `connect(url, token, schema, table)` **with arguments**, then `url` and `token` arguments become mandatory! But `schema` and `table` remain always optional.
+- When calling `connect(url, token, schema, table, primekey, timeout)` **with arguments**, then `url` and `token`, `schema` and `table` are mandatore. `primekey` is optional and defaults to `'id'` and `timeout` defaults to `15000` milliseconds. Same applies to the `new HarperDB()` call.
 
 - When calling `connect()` **without arguments** then you get back the handle of the currently 'connected' HarperDB Instance. (It throws an error if you have not yet connected.)
 
 ```js
 import {connect, run} from "node-harperdb"
 
-connect() // NOT OK: Cannot fetch db handle because of missing credentials!
+connect() // BAD: Cannot fetch db handle because of missing credentials!
 
-connect("https://foobar-geekhunger.harperdbcloud.com", "aGFsbG22Z2vla2m1bmdMc0==") // connect to your Cloud Instance
+connect("https://foobar-geekhunger.harperdbcloud.com", "aGFsbG22Z2vla2m1bmdMc0==", "mvp", "test") // connect to your Cloud Instance
 
-let db = connect() // OK: Returns a handle to the current db connection. Use it to execute requests on the database.
-```
-
-Once connected, you can switch the schema and table at any time *(without passing your credentials each time)*. To swap schema and/or table simply use `mount(schema, table)` which is really a shortcut to `connect(undefined, undefined, schema, table)`!
-
-```js
-import {connect, mount} from "node-harperdb"
-
-connect(
-    "https://foobar-geekhunger.harperdbcloud.com", // your HarperDB Instance
-    "aGFsbG22Z2vla2m1bmdMc0==", // your HarperDB Basic-Auth token
-    "mvp", // your HarperDB schema (alias namespace)
-    "users" // your HarperDB table
-)
+let db = connect() // GOOD: Returns a handle to the current db connection. Use it to execute requests on the database.
 
 connect().insert({...}) // do something here...
-
-mount("https://foobar-geekhunger.harperdbcloud.com", "aGFsbG22Z2vla2m1bmdMc0==", "mvp", "sessions") // swap the HarperDB instance, schema and/or table
-
-connect().insert({...}) // do something there...
 ```
-
 
 
 <br>
@@ -217,7 +198,11 @@ This is were Strings come in... If `query` argument is a String then it will be 
 
 ```js
 // here's the exact same SQLite query but simpler...
-const response = await db.request(`SELECT * FROM ${db.schema}.${db.table} WHERE id = 1`)
+const response = await db.request(`
+    SELECT *
+    FROM ${db.schema}.${db.table}
+    WHERE id = 1
+`)
 console.log(response)
 ```
 
@@ -252,7 +237,11 @@ Very similar to `db.request` but with one key difference: **It prepares the data
 > Obviously, the schema and table would *not* be created just yet, if it's a read request, like 'search_by_conditions'. Namespaces are only auto-created on write operations like 'insert'.
 
 ```js
-mount("foo.bar") // db.schema = "foo"; db.table = "bar";
+const db = connect(
+    "https://foobar-geekhunger.harperdbcloud.com",
+    "aGFsbG22Z2vla2m1bmdMc0==",
+    "foo.bar" // schema and table in one go, separated by a dot, is same as `db.schema = "foo"; db.table = "bar";`
+)
 try {
     console.log(await connect().select({username: "foobar"})) // will not create table "bar" because it's a read request
     console.log(await connect().upsert({username: "foobar"})) // will create table "bar" and write a new record into it!
@@ -273,7 +262,6 @@ connect()
     console.log(response)
 })
 ```
-
 
 
 <br>
@@ -334,7 +322,6 @@ await db.request({
 ```
 
 
-
 <br>
 
 - <h3 id="db-update"><code>db.update(records)</code></h3>
@@ -364,7 +351,6 @@ Just keep in mind that *you need to specify the primary key for your record(s)* 
     }
 }()
 ```
-
 
 
 <br>
@@ -437,8 +423,6 @@ connect()
 </p>
 
 
-
-
 <br>
 
 - <h3 id="db-delete"><code>db.delete(uid)</code></h3>
@@ -470,7 +454,6 @@ const ids = connect().uid([
 ])
 connect().delete(ids)
 ```
-
 
 
 <br>
@@ -556,8 +539,6 @@ connect()
 ```
 
 
-
-
 <br>
 
 ### `db.pipe(req, ...args)` & `db.drain()`
@@ -606,8 +587,6 @@ const findings = await db.drain() // NOW, fetch the all of the results of the qu
 `db.drain` will wrap all of the single Promises from `db.pipeline` (which were stored there by db.drain) into a new super-mega-wrapped😅 `Promise.all` Promise. It will then execute the queued queries asynchronously all at once and flush the `db.pipeline` array.
 
 The return value (once the Promise is resolve) is an array of responses.
-
-
 
 
 <br>
