@@ -79,7 +79,6 @@ import {HarperDB, connect, run} from "node-harperdb"
 - [`.request(query)`](#db-request)
 
 
-
 <br>
 <br>
 
