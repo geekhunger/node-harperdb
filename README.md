@@ -1,10 +1,40 @@
-# node-harperdb
+# Readme
+## Notes
 
-> **Note:** If you want an alternative, there's also [Harperive](https://www.npmjs.com/package/harperive).
-
+> **Important:** Version 2.0.2 introduces **breaking changes!**
+>
+> - Rewritten from CJS to ESM
+> - Function `database()` has been renamed to `connect()`
+> - `mount()` has been removed entirely
+>
+> You can write your own `mount()` function or module, if you like to...
+>
+> ```js
+> import {connect} from "node-harperdb"
+>
+> export const CREDENTIALS = {
+>   url: "https://foobar-geekhunger.harperdbcloud.com",
+>   token: "aGFsbG22Z2vla2m1bmdMc0==",
+>   schema: "foobar"
+> }
+>
+> export const mount = function(table, primekey = "id", timeout = 15000) {
+>    return connect(
+>       CREDENTIALS.url,
+>       CREDENTIALS.token,
+>       CREDENTIALS.schema,
+>       table,
+>       primekey,
+>       timeout
+>   )
+> }
+>
+> export default mount
+>```
+>
 > **One word of warning:** I use this package for some of my personal projects and therefore I might introduce breaking changes in future updates (or maybe not 🤗 ). If you plan to use this package in production, you should better fork the Git repo and maintain it yourself!
-
-> **Important:** Version 2.0.2 introduces breaking changes!<br>(Rewritten from CJS to ESM. Function `database()` has been renamed to `connect()` and `mount()` has been removed entirely.)
+>
+> **Alternative:** If you want an alternative to this package, then there's also [Harperive](https://www.npmjs.com/package/harperive).
 
 
 <br>
