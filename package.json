@@ -3,7 +3,7 @@
     "description": "NodeJS/ExpressJS connector for HarperDB",
     "main": "connector.js",
     "type": "module",
-    "version": "2.2.0",
+    "version": "2.3.0",
     "private": false,
     "author": "geekhunger <hello@geekhunger.com>",
     "license": "MIT",

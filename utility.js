@@ -15,9 +15,6 @@ export const validJson = function(input) {
 
 export const validPayload = function(input) {
     assert(type({string: input}, {array: input}), "Argument must be string or an array of strings!")
-    if(type({array: input})) {
-        assert(input.every(vartype("string")), "Array must contain strings only!")
-    }
     return type({string: input})
         ? [input]
         : input
