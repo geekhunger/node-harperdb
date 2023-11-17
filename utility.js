@@ -1,8 +1,9 @@
-import vartype from "type-approve"
+import Type from "type-approve"
 
-export const type = vartype.check
-export const add = vartype.add
-export const assert = vartype.assert 
+export const assert = Type.assert
+export const type = Type.check
+export const add = Type.add
+export const vartype = name => add(name)
 
 export const validJson = function(input) {
     try {
@@ -13,9 +14,13 @@ export const validJson = function(input) {
 }
 
 export const validPayload = function(input) {
-    return type({array: input}, {string: input})
-        ? input
-        : [input]
+    assert(type({string: input}, {array: input}), "Argument must be string or an array of strings!")
+    if(type({array: input})) {
+        assert(input.every(vartype("string")), "Array must contain strings only!")
+    }
+    return type({string: input})
+        ? [input]
+        : input
 }
 
 export const removeTimestamps = function(input) {
