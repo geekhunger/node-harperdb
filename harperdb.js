@@ -176,7 +176,7 @@ export class HarperDB {
     }
 
 
-    async detete(uid) { // can be a single string or an array
+    async delete(uid) { // can be a single string or an array
         return await this.run({
             operation: "delete",
             schema: this.schema,
