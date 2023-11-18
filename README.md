@@ -632,9 +632,7 @@ The return value (once the Promise is resolve) is an array of responses.
 
 ## SQL queries
 
-This package is largely a wrapper around the available NoSQL operations of the HarperDB API. It was created to provide cleaner and easier syntax for interacting with your HarperDB (Cloud) Instance.
-
-**If execution performance is critical to your application,** I'd suggest you use `{run}` (from module import call) or [`db.request(query)`](#db-request) and pass it a valid SQL statement directly, instead of using methods like `insert`, `update`, `select` and so on.
+The `node-harperdb` package is largely a wrapper around the available NoSQL operations of the HarperDB API. It was created to provide cleaner and easier syntax for interacting with your HarperDB (Cloud) Instance. **If execution performance is critical to your application,** I'd suggest you use `{run}` (from module import call) or [`db.request(query)`](#db-request) and pass it a valid SQL statement directly, instead of using methods like `insert`, `update`, `select` and so on.
 
 *`db.request()` has actually this neat shortcut...*
 
@@ -643,9 +641,9 @@ import {connect, run} from "node-harperdb"
 run("select * from foo.bar limit 1") // equivalent to: db.request("...")
 ```
 
-Raw SQL queries have some advantages over NoSQL operations too. You can actually cut on the number of requests that are made to the HarperDB API. Especially, when aggregating data. SQL would be more efficient and convemient at selecting and joining tables than, say, `db.select`. (It also puts the processing load onto your (Cloud) VPS where HarperDB is running, instead of your Web Server.)
+Raw SQL queries have some advantages over NoSQL operations too. You can actually cut on the number of requests that are made to the HarperDB API. Especially, when aggregating data. SQL would be more efficient and convenient at selecting and joining tables than, say, `db.select`. (It also puts the processing load onto your (Cloud) VPS where HarperDB is running, instead of your own web server.)
 
-> When using SQL statements, you can also safely omit the schema and table settings in the constructor because you need to include them inside your SQL queries anyways! No need for duplication here.^^
+> When using SQL statements, you can also safely omit the schema and table settings in the constructor because you need to include them inside your SQL queries anyways. No need for duplication here.
 
 ```js
 import {connect, run} from "node-harperdb"
