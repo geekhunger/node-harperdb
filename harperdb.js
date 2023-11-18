@@ -242,7 +242,7 @@ export class HarperDB {
                     }
                 }
             }
-            // search result will be an array of existing db records that 'include' or 'contain' one or more filtering attrubutes
+            // search result will be an array of existing db records that 'include' or 'contain' one or more filtering attributes
             // it's like searching a sub-string in text
             query.operator = "or"
             return await this.run(query)
