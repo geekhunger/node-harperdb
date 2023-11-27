@@ -1,14 +1,5 @@
-import {
-    type,
-    add as typecheck,
-    assert,
-    validJson,
-    validPayload,
-    removeTimestamps,
-    trimQuery,
-    isSearchQuery
-} from "./utility.js"
-
+import {type, validate, assert} from "type-approve"
+import {validJson, validPayload, removeTimestamps, trimQuery, isSearchQuery} from "./utility.js"
 import request from "needle"
 
 export class HarperDB {
@@ -225,7 +216,7 @@ export class HarperDB {
             return await this.run(query)
         }
         
-        if(type({array: filter}) && filter.every(typecheck("string"))) {
+        if(type({array: filter}) && filter.every(validate("string"))) {
             const struct = await this.run({
                 operation: "describe_table",
                 schema: this.schema,
@@ -248,7 +239,7 @@ export class HarperDB {
             return await this.run(query)
         }
 
-        if(type({array: filter}) && filter.every(typecheck("object"))) {
+        if(type({array: filter}) && filter.every(validate("object"))) {
             for(const rec of filter) {
                 this.pipe(this.select, rec) // piping to this.select as plain-object (not an array)!
             }

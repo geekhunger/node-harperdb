@@ -1,9 +1,4 @@
-import Type from "type-approve"
-
-export const assert = Type.assert
-export const type = Type.check
-export const add = Type.add
-export const vartype = name => add(name)
+import {type, assert} from "type-approve"
 
 export const validJson = function(input) {
     try {

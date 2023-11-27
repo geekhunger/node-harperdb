@@ -1,7 +1,6 @@
 import HarperDB from "./harperdb.js"
-import vartype from "type-approve"
+import {type, assert} from "type-approve"
 
-const {check: type, assert} = vartype
 let datastore
 
 export const connect = function(url, token, schema, table, primekey) {
