@@ -9,18 +9,23 @@ export const validJson = function(input) {
 }
 
 export const validPayload = function(input) {
-    assert(type({string: input}, {array: input}), "Argument must be string or an array of strings!")
-    return type({string: input})
-        ? [input]
-        : input
+    assert(
+        type({string: input}, {object: input}, {array: input}),
+        "Argument must be string or an array of strings!"
+    )
+    return type({array: input})
+        ? input
+        : [input]
 }
 
 export const removeTimestamps = function(input) {
     let records = validPayload(input)
     for(let record of records) {
-        for(const attribute of Object.keys(record)) {
-            if(/^__\w*time__$/i.test(attribute)) { // e.g.: __createdtime__, __updatedtime__
-                delete record[attribute]
+        if(type({object: record})) {
+            for(const attribute of Object.keys(record)) {
+                if(/^__\w*time__$/i.test(attribute)) { // e.g.: __createdtime__, __updatedtime__
+                    delete record[attribute]
+                }
             }
         }
     }
